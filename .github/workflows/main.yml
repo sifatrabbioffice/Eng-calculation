@@ -1,0 +1,127 @@
+name: Build Unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare Capacitor iOS project
+        run: |
+          mkdir -p www
+          cat > www/index.html <<'HTMLEOF'
+          <!DOCTYPE html>
+          <html lang="bn"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+          <title>Site Calculator – BOQ</title>
+          <style>
+          :root{--bg:#f4f1ea;--card:#fff;--tx:#1d1d1b;--mut:#6b675e;--ac:#d9622b;--ac2:#fff;--bd:#e2ddd0;--ok:#eef7ee;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+          @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--card:#232328;--tx:#f0eee8;--mut:#9a978e;--bd:#35353c;--ok:#1f2e22}}
+          :root[data-theme="dark"]{--bg:#17171a;--card:#232328;--tx:#f0eee8;--mut:#9a978e;--bd:#35353c;--ok:#1f2e22}
+          *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;max-width:560px;margin:auto;padding:14px}
+          h1{font-size:22px;margin:0;padding:16px 16px 2px;background:var(--ac);color:#fff;border-radius:16px 16px 0 0}p.s{margin:0 0 10px;padding:0 16px 14px;background:var(--ac);color:#ffe9dc;font-size:13px;border-radius:0 0 16px 16px;display:flex;justify-content:space-between;gap:8px}
+          .tabs{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5;padding-top:6px}
+          .card{box-shadow:0 2px 8px rgba(0,0,0,.06)}
+          input:focus,select:focus{outline:2px solid var(--ac);border-color:transparent}
+          .row.big{border:0;margin-top:6px;padding:10px;background:var(--ac);color:#fff;border-radius:9px}.row.big b{font-size:19px}
+          .cp{width:100%;margin-top:10px;padding:11px;border:1px solid var(--ac);color:var(--ac);background:transparent;border-radius:10px;font-size:15px}
+          .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px}
+          .tabs button{flex:none;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:9px 14px;border-radius:20px;font-size:14px}
+          .tabs button.on{background:var(--ac);color:var(--ac2);border-color:var(--ac)}
+          .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-top:8px}
+          .g{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+          label{font-size:12px;color:var(--mut);display:block}
+          input,select{width:100%;margin-top:3px;padding:10px;font-size:16px;border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--tx)}
+          .res{background:var(--ok);border-radius:12px;padding:12px;margin-top:10px}
+          .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--bd);font-size:15px}
+          .row:last-child{border:0}.row b{font-size:16px}
+          .note{font-size:12px;color:var(--mut);margin-top:8px}
+          h3{margin:0 0 10px;font-size:15px}
+          </style></head><body>
+          <h1>🏗️ Site Calculator</h1><p class="s"><span>Casting · Rebar · Brick · Cost · আরও — input দিলেই auto হিসাব</span><span onclick="tg()" style="cursor:pointer">🌓</span></p>
+          <div class="tabs" id="tabs"></div><div id="app"></div>
+          <script>
+          const $=id=>document.getElementById(id);
+          const f=(n,d=2)=>isFinite(n)?(+n).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d}):'–';
+          const v=id=>parseFloat($(id).value)||0;
+          const inp=(id,l,val,t='number')=>`<div><label>${l}</label><input id="${id}" type="${t}" inputmode="decimal" value="${val}" oninput="calc()"></div>`;
+          const rows=a=>`<div class="res">${a.map(([k,x,u],i)=>`<div class="row${i==a.length-1?' big':''}"><span>${k}</span><b>${f(x)} ${u||''}</b></div>`).join('')}</div>`;
+          const T={
+          cast:{n:'Casting',h:()=>`<div class="card"><h3>Volume ও Ratio</h3><div class="g">${inp('L','Length (ft)',10)}${inp('W','Width (ft)',10)}${inp('H','Height/Thick (ft)',0.5)}${inp('Q','Nos',1)}${inp('r1','Cement',1)}${inp('r2','Sand',1.5)}${inp('r3','Khoa',3)}${inp('df','Dry factor',1.54)}</div></div><div id="o"></div>`,
+          c:()=>{const wet=v('L')*v('W')*v('H')*v('Q'),dry=wet*v('df'),s=v('r1')+v('r2')+v('r3');return rows([['Wet Volume',wet,'CFT'],['Dry Volume',dry,'CFT'],['Cement',dry*v('r1')/s/1.25,'Bags'],['Sand',dry*v('r2')/s,'CFT'],['Khoa/Chips',dry*v('r3')/s,'CFT']])+'<div class="note">1 bag (50kg) = 1.25 CFT ধরা হয়েছে</div>'}},
+          col:{n:'Column',h:()=>`<div class="card"><h3>Column + Rebar</h3><div class="g">${inp('b','Width (inch)',12)}${inp('d','Depth (inch)',12)}${inp('ch','Height (ft)',10)}${inp('cn','Column nos',4)}${inp('mb','Main bar nos',8)}${inp('md','Main dia (mm)',16)}${inp('ll','Lap/dev (ft)',2)}${inp('td','Tie dia (mm)',8)}${inp('sp','Tie spacing (inch)',6)}${inp('cv','Cover (inch)',1.5)}${inp('ws','Wastage %',3)}</div></div><div id="o"></div>`,
+          c:()=>{const n=v('cn'),vol=v('b')*v('d')/144*v('ch')*n,w=1+v('ws')/100,ml=(v('ch')+v('ll'))*0.3048,mw=v('md')**2/162.2*ml*v('mb')*n*w,ties=(Math.ceil(v('ch')*12/v('sp'))+1)*n,pc=2*((v('b')-2*v('cv'))+(v('d')-2*v('cv')))*0.0254+20*v('td')/1000,tw=v('td')**2/162.2*pc*ties*w;return rows([['Concrete',vol,'CFT'],['Main bar',mw,'kg'],['Tie/Ring nos',ties,''],['Tie cutting length',pc/0.3048,'ft'],['Tie weight',tw,'kg'],['মোট Rebar',mw+tw,'kg']])+'<div class="note">Tie hook = 135°, 10d × 2 ধরা হয়েছে</div>'}},
+          brk:{n:'Brick',h:()=>`<div class="card"><h3>ইটের সংখ্যা</h3><div class="g">${inp('wl','Wall length (ft)',20)}${inp('wh','Wall height (ft)',10)}${inp('wt','Thickness',10,'number')}${inp('op','Opening (SFT)',20)}${inp('bw','Wastage %',5)}</div><div class="note">Thickness: 5 অথবা 10 (inch)</div></div><div id="o"></div>`,
+          c:()=>{const a=Math.max(v('wl')*v('wh')-v('op'),0),t=v('wt'),cft=a*t/12,nb=cft*11.25,n=t<=5?a*4.75:nb;return rows([['Net Area',a,'SFT'],['Volume',cft,'CFT'],['Brick (wastage ছাড়া)',n,'pcs'],['Brick (wastage সহ)',n*(1+v('bw')/100),'pcs']])+'<div class="note">10" = 11.25/CFT, 5" = 4.75/SFT। BFS = 3 ইট/SFT</div>'}},
+          reb:{n:'Rebar KG',h:()=>`<div class="card"><h3>রডের ওজন</h3><div class="g">${inp('rd','Dia (mm)',12)}${inp('rl','Total length',100)}<div><label>Unit</label><select id="ru" onchange="calc()"><option value="ft">Feet</option><option value="m">Meter</option></select></div>${inp('rw','Wastage %',3)}</div></div><div id="o"></div>`,
+          c:()=>{const m=$('ru').value=='ft'?v('rl')*0.3048:v('rl'),u=v('rd')**2/162.2;return rows([['Unit wt',u,'kg/m'],['Unit wt',u*0.3048,'kg/ft'],['মোট ওজন',u*m*(1+v('rw')/100),'kg'],['টন',u*m*(1+v('rw')/100)/1000,'ton']])+'<div class="note">সূত্র: D² ÷ 162.2</div>'}}
+          };
+          const mk=(n,t,fs,fn,note='')=>({n,h:()=>`<div class="card"><h3>${t}</h3><div class="g">${fs.map(a=>inp(a[0],a[1],a[2])).join('')}</div></div><div id="o"></div>`,c:()=>rows(fn())+(note?`<div class="note">${note}</div>`:'')});
+          Object.assign(T,{
+          shut:mk('Formwork','Shuttering Area (SFT)',[['fc','Column: b (in)',12],['fd','Column: d (in)',12],['fh','Column height (ft)',10],['fn','Column nos',4],['bb','Beam: b (in)',10],['bd','Beam: depth (in)',18],['bl','Beam length (ft)',100],['sa','Slab area (SFT)',400]],()=>{const c=2*(v('fc')+v('fd'))/12*v('fh')*v('fn'),b=(v('bb')+2*v('bd'))/12*v('bl'),s=v('sa');return[['Column',c,'SFT'],['Beam',b,'SFT'],['Slab',s,'SFT'],['মোট',c+b+s,'SFT'],['মোট',(c+b+s)*0.0929,'m²']]},'Beam = নিচ + দুই পাশ'),
+          earth:mk('Earthwork','Excavation ও Backfill',[['el','Length (ft)',20],['ew','Width (ft)',20],['ed','Depth (ft)',4],['ws','Working space/পাশ (ft)',1],['sl','Slope (H per 1 V)',0],['sv','Structure volume (CFT)',200],['cf','Compaction factor',1.2]],()=>{const D=v('ed'),x=2*v('ws')+2*v('sl')*D,V=(v('el')+x)*(v('ew')+x)*D,B=Math.max(V-v('sv'),0);return[['Excavation',V,'CFT'],['Excavation',V*0.02832,'m³'],['Backfill (in-place)',B,'CFT'],['Loose fill দরকার',B*v('cf'),'CFT']]},'Rectangular pit; slope দিলে উপরের মাপ বাড়ে'),
+          sol:mk('Soling','BFS ও Khoa ইট',[['sf','BFS area (SFT)',500],['kc','Khoa (CFT)',100],['kb','ইট/100 CFT khoa',875]],()=>[['BFS ইট (3/SFT)',v('sf')*3,'pcs'],['Khoa ভাঙতে ইট',v('kc')*v('kb')/100,'pcs']]),
+          stair:mk('Stair','Staircase',[['sh','Floor height (in)',120],['rs','Riser (in)',6],['tr','Tread (in)',10],['sw','Width (ft)',4],['wt','Waist slab (in)',5]],()=>{const n=Math.round(v('sh')/v('rs')),r=v('sh')/n,g=(n-1)*v('tr'),L=Math.hypot(v('sh'),g),w=v('sw'),wv=L/12*w*v('wt')/12,st=n*0.5*r/12*v('tr')/12*w;return[['Riser nos',n,''],['Actual riser (in)',r,''],['Tread nos',n-1,''],['Waist length',L/12,'ft'],['Waist vol',wv,'CFT'],['Step vol',st,'CFT'],['মোট কংক্রিট',wv+st,'CFT']]}),
+          plas:mk('Plaster','Plaster',[['pa','Area (SFT)',1000],['pt','Thickness (in)',0.5],['pc','Cement',1],['ps','Sand',4],['pd','Dry factor',1.3]],()=>{const d=v('pa')*v('pt')/12*v('pd');return[['Wet vol',d/v('pd'),'CFT'],['Cement',d*v('pc')/(v('pc')+v('ps'))/1.25,'Bags'],['Sand',d*v('ps')/(v('pc')+v('ps')),'CFT']]},'Plaster mortar dry factor ~1.25–1.35'),
+          fin:mk('Tile/Paint','Tiles ও Paint',[['ta','Floor area (SFT)',500],['tl','Tile L (in)',24],['tw','Tile W (in)',24],['tx','Wastage %',8],['pa2','Paint area (SFT)',1500],['pk','Coats',2],['pv','Coverage SFT/L',100]],()=>{const n=v('ta')/(v('tl')*v('tw')/144)*(1+v('tx')/100);return[['Tiles',Math.ceil(n),'pcs'],['Paint',v('pa2')*v('pk')/v('pv'),'Litre']]}),
+          lvl:mk('Level/Pipe','RL, Slope, Pipe, Water',[['rl','Start RL',100],['ln','Length (ft)',100],['sn','Slope 1 in',100],['pl','Total pipe (ft)',500],['pp','Pipe length (ft)',10],['wc','Water (CFT)',100]],()=>{const d=v('ln')/v('sn');return[['Drop/Rise',d,'ft'],['End RL',v('rl')-d,'ft'],['Gradient',100/v('sn'),'%'],['Pipe nos',Math.ceil(v('pl')/v('pp')),''],['Water',v('wc')*28.317,'Litre']]}),
+          bar:mk('BBS','Spacing, Crank, Lap',[['cs','Clear span (ft)',12],['sp','Spacing (in)',6],['cd','Bar dia (mm)',16],['lm','Lap (× dia)',40],['bd2','Beam depth (in)',18],['cr','Crank nos',2],['cv2','Cover (in)',1.5]],()=>{const lap=v('lm')*v('cd')/25.4;return[['Bar nos',Math.floor(v('cs')*12/v('sp'))+1,''],['Lap length',lap,'in'],['Crank extra',v('cr')*0.42*(v('bd2')-2*v('cv2')),'in'],['90° hook (≈9d)',9*v('cd')/25.4,'in']]},'Crank extra = 0.42 × (D − 2×cover) প্রতিটি'),
+          conv:mk('Convert','Unit Conversion',[['u1','ft',1],['u2','CFT',1],['u3','SFT',1],['u4','kg',1000],['u5','MPa',25]],()=>[['ft → m',v('u1')*0.3048,'m'],['ft → mm',v('u1')*304.8,'mm'],['CFT → m³',v('u2')*0.02832,'m³'],['SFT → m²',v('u3')*0.0929,'m²'],['kg → ton',v('u4')/1000,'ton'],['MPa → psi',v('u5')*145.038,'psi'],['MPa → ksi',v('u5')*0.145038,'ksi']]),
+          prog:mk('Progress','Progress ও Recon',[['pq','Total work',1000],['pd2','Done',350],['td','Total days',60],['te','Days elapsed',25],['is','Store issued',100],['th','Theoretical use',92]],()=>{const a=v('pd2')/v('pq')*100,p=v('te')/v('td')*100;return[['Actual %',a,'%'],['Planned %',p,'%'],['Variance',a-p,'%'],['Daily rate দরকার',(v('pq')-v('pd2'))/Math.max(v('td')-v('te'),1),'/day'],['Material পার্থক্য',v('is')-v('th'),''],['Wastage',(v('is')-v('th'))/v('is')*100,'%']]}),
+          bill:mk('MB/Bill','Measurement ও Bill',[['ml','L (ft)',10],['mb','B (ft)',10],['mh','H (ft)',1],['mn','Nos',1],['mr','Rate/CFT',500]],()=>{const q=v('ml')*v('mb')*v('mh')*v('mn');return[['Quantity',q,'CFT'],['Amount',q*v('mr'),'Tk']]})
+          });
+          const IC={cast:'🧱',col:'🏛️',brk:'🧱',reb:'🔩',shut:'📦',earth:'⛏️',sol:'🪨',stair:'🪜',plas:'🧰',fin:'🎨',lvl:'📐',bar:'➰',conv:'🔄',prog:'📈',bill:'🧾',elem:'🏗️',slab:'🔲',ring:'⭕',fm:'🧪',mort:'🪣',cost:'💰',tank:'💧',land:'🗺️'};
+          Object.assign(T,{
+          elem:mk('Elements','Footing · Beam · Slab Volume',[['f1','Footing L (ft)',5],['f2','Footing W (ft)',5],['f3','Footing thick (ft)',1.5],['f4','Footing nos',4],['b1','Beam b (in)',10],['b2','Beam D (in)',18],['b3','Beam length (ft)',100],['s1','Slab L (ft)',20],['s2','Slab W (ft)',15],['s3','Slab t (in)',5]],()=>{const F=v('f1')*v('f2')*v('f3')*v('f4'),B=v('b1')*v('b2')/144*v('b3'),S=v('s1')*v('s2')*v('s3')/12,T=F+B+S,d=T*1.54;return[['Footing',F,'CFT'],['Beam',B,'CFT'],['Slab',S,'CFT'],['Cement (1:1.5:3)',d/5.5/1.25,'Bags'],['Sand',d*1.5/5.5,'CFT'],['Khoa',d*3/5.5,'CFT'],['মোট কংক্রিট',T,'CFT']]},'Ratio 1:1.5:3, dry factor 1.54'),
+          slab:mk('Slab Rebar','Slab Rebar (Main + Distribution)',[['a1','Short span (ft)',12],['a2','Long span (ft)',15],['a3','Main spacing (in)',6],['a4','Main dia (mm)',10],['a5','Dist spacing (in)',10],['a6','Dist dia (mm)',8],['a7','Extra/bar (ft)',1.5],['a8','Wastage %',3]],()=>{const w=1+v('a8')/100,nm=Math.floor(v('a2')*12/v('a3'))+1,nd=Math.floor(v('a1')*12/v('a5'))+1,wm=v('a4')**2/162.2*(v('a1')+v('a7'))*0.3048*nm*w,wd=v('a6')**2/162.2*(v('a2')+0.5)*0.3048*nd*w;return[['Main bar nos',nm,''],['Dist bar nos',nd,''],['Main wt',wm,'kg'],['Dist wt',wd,'kg'],['মোট Rebar',wm+wd,'kg']]},'Main bar short span-এ, Extra = bent/ল্যাপ/সাপোর্ট'),
+          ring:mk('Stirrup','Ring / Stirrup Cutting',[['r1','b (in)',12],['r2','D (in)',18],['r3','Cover (in)',1.5],['r4','Dia (mm)',8],['r5','Span (ft)',12],['r6','End zone (ft)',3],['r7','End spacing (in)',4],['r8','Mid spacing (in)',6]],()=>{const d=v('r4')/25.4,L=2*(v('r1')-2*v('r3'))+2*(v('r2')-2*v('r3'))+20*d,n=2*Math.ceil(v('r6')*12/v('r7'))+Math.ceil((v('r5')-2*v('r6'))*12/v('r8'));return[['Cutting length',L,'in'],['Cutting length',L/12,'ft'],['Ring nos',n,''],['মোট ওজন',v('r4')**2/162.2*L*0.0254*n,'kg']]},'Hook 135° = 10d × 2 ধরা হয়েছে'),
+          fm:mk('Sand FM','Sand FM ও Cube Strength',[['m1','Cum % ret 4.75mm',2],['m2','2.36mm',10],['m3','1.18mm',25],['m4','0.6mm',50],['m5','0.3mm',80],['m6','0.15mm',95],['cl','Cube load (kN)',600],['cn2','Cube size (mm)',150]],()=>{const fm=(v('m1')+v('m2')+v('m3')+v('m4')+v('m5')+v('m6'))/100,mp=v('cl')*1000/(v('cn2')**2);return[['Fineness Modulus',fm,''],['Cube strength',mp,'MPa'],['Cylinder ≈ 0.8×',mp*0.8,'MPa'],['Cube strength',mp*145.038,'psi']]},'FM 2.2–3.2 ভালো। Cumulative % retained দিন'),
+          mort:mk('Mortar','গাঁথুনির Mortar ও ইট',[['g1','Masonry vol (CFT)',100],['g2','Mortar %',25],['g3','Cement',1],['g4','Sand',4],['g5','Dry factor',1.27]],()=>{const w=v('g1')*v('g2')/100,d=w*v('g5'),s=v('g3')+v('g4');return[['Wet mortar',w,'CFT'],['Cement',d*v('g3')/s/1.25,'Bags'],['Sand',d*v('g4')/s,'CFT'],['ইট (11.25/CFT)',v('g1')*11.25,'pcs']]}),
+          cost:mk('Cost','Material Cost Estimate',[['c1','Cement bags',100],['c1r','Rate/bag',550],['c2','Sand CFT',200],['c2r','Rate/CFT',60],['c3','Khoa CFT',300],['c3r','Rate/CFT',150],['c4','Rod kg',2000],['c4r','Rate/kg',95],['c5','Brick pcs',5000],['c5r','Rate/pc',12],['c6','Labour/অন্যান্য Tk',50000]],()=>{const a=[v('c1')*v('c1r'),v('c2')*v('c2r'),v('c3')*v('c3r'),v('c4')*v('c4r'),v('c5')*v('c5r')];return[['Cement',a[0],'Tk'],['Sand',a[1],'Tk'],['Khoa',a[2],'Tk'],['Rod',a[3],'Tk'],['Brick',a[4],'Tk'],['Labour',v('c6'),'Tk'],['মোট খরচ',a.reduce((x,y)=>x+y,0)+v('c6'),'Tk']]},'Rate গুলো নিজের বাজার অনুযায়ী বদলান'),
+          tank:mk('Tank','Water Tank',[['t1','L (ft)',6],['t2','W (ft)',5],['t3','Water depth (ft)',4],['t4','Round dia (ft)',4],['t5','Round height (ft)',5]],()=>{const r=v('t1')*v('t2')*v('t3'),c=Math.PI*(v('t4')/2)**2*v('t5');return[['Rect CFT',r,'CFT'],['Rect',r*28.317,'Litre'],['Round CFT',c,'CFT'],['Round',c*28.317,'Litre']]}),
+          land:mk('Land','জমি ও Area',[['ld','Katha',5],['sh1','Rect L (ft)',40],['sh2','Rect W (ft)',30],['ci','Circle dia (ft)',10]],()=>[['Katha → SFT',v('ld')*720,'SFT'],['Katha → Decimal',v('ld')*720/435.6,'dec'],['Katha → m²',v('ld')*720*0.0929,'m²'],['Katha → Bigha',v('ld')/20,'bigha'],['Rect Area',v('sh1')*v('sh2'),'SFT'],['Perimeter',2*(v('sh1')+v('sh2')),'ft'],['Circle Area',Math.PI*(v('ci')/2)**2,'SFT']],'1 katha = 720 SFT, 1 decimal = 435.6 SFT, 1 bigha = 20 katha')
+          });
+          let cur='cast';
+          function show(k){cur=k;$('tabs').innerHTML=Object.keys(T).map(x=>`<button class="${x==k?'on':''}" onclick="show('${x}')">${IC[x]||'📐'} ${T[x].n}</button>`).join('');$('app').innerHTML=T[k].h();calc()}
+          function calc(){$('o').innerHTML=T[cur].c()+`<button class=cp onclick=cpy(this)>📋 Copy result</button>`}
+          function cpy(b){const t=[...document.querySelectorAll('.res .row')].map(r=>r.innerText.replace(/\n+/g,': ')).join('\n');try{navigator.clipboard.writeText(T[cur].n+'\n'+t)}catch(e){}b.textContent='✅ Copied'}
+          function tg(){const r=document.documentElement,d=r.dataset.theme=='dark'||(!r.dataset.theme&&matchMedia('(prefers-color-scheme:dark)').matches);r.dataset.theme=d?'light':'dark'}
+          show('cast');
+          </script></body></html>
+          HTMLEOF
+          npm init -y
+          npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/ios@7
+          npx cap init "Site Calculator" com.site.calculator --web-dir=www
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Build (no code signing)
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r SiteCalculator-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SiteCalculator-unsigned-ipa
+          path: SiteCalculator-unsigned.ipa
